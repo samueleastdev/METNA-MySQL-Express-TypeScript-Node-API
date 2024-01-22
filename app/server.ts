@@ -3,6 +3,8 @@ import cors from 'cors';
 import db from './models';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
+import awsRoutes from './routes/aws.routes';
+import trackRoutes from './routes/track.routes';
 
 const app = express();
 
@@ -49,6 +51,8 @@ app.get('/', (req: Request, res: Response) => {
 
 authRoutes(app);
 userRoutes(app);
+awsRoutes(app);
+trackRoutes(app);
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {

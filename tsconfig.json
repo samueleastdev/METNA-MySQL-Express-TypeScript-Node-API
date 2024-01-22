@@ -11,10 +11,6 @@
     "strict": true,
     "skipLibCheck": true,
   },
-  "include": [
-    "app/**/*"
-  ],
-  "exclude": [
-    "./build"
-  ]
+  "include": ["app/**/*"],
+  "exclude": ["./build", "./client"],
 }

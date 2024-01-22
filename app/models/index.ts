@@ -3,6 +3,7 @@ import { Sequelize } from 'sequelize';
 import userModel from './user.model';
 import roleModel from './role.model';
 import refreshTokenModel from './refresh.token.model';
+import tracksModel from './track.model';
 
 const sequelize = new Sequelize(dbConfig.DB_DATABASE, dbConfig.DB_USERNAME, dbConfig.DB_PASSWORD, {
   host: dbConfig.DB_HOST,
@@ -28,6 +29,7 @@ db.sequelize = sequelize;
 db.user = userModel(sequelize);
 db.role = roleModel(sequelize);
 db.refreshToken = refreshTokenModel(sequelize);
+db.track = tracksModel(sequelize);
 
 db.role.belongsToMany(db.user, {
   through: 'user_roles',
@@ -43,6 +45,11 @@ db.refreshToken.belongsTo(db.user, {
 });
 
 db.user.hasOne(db.refreshToken, {
+  foreignKey: 'userId',
+  targetKey: 'id',
+});
+
+db.track.belongsTo(db.user, {
   foreignKey: 'userId',
   targetKey: 'id',
 });
