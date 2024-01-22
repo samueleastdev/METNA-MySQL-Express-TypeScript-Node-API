@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json", // Extend your main tsconfig.json
+  "compilerOptions": {
+    "noImplicitAny": false
+  },
+  "include": ["**/*.spec.ts"] // Specify the files to be included (your Jest spec files)
+}
