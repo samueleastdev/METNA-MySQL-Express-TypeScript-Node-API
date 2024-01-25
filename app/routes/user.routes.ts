@@ -8,11 +8,15 @@ export default function (app: Express) {
     next();
   });
 
-  app.get('/api/test/all', controller.allAccess);
+  app.get('/api/user', [authJwt.verifyToken], controller.readUser);
 
-  app.get('/api/test/user', [authJwt.verifyToken], controller.userBoard);
+  app.post('/api/user', [authJwt.verifyToken], controller.createUser);
 
-  app.get('/api/test/mod', [authJwt.verifyToken, authJwt.isModerator], controller.moderatorBoard);
+  app.put('/api/user', [authJwt.verifyToken], controller.updateUser);
 
-  app.get('/api/test/admin', [authJwt.verifyToken, authJwt.isAdmin], controller.adminBoard);
+  app.get('/api/users/user', [authJwt.verifyToken], controller.userBoard);
+
+  app.get('/api/users/mod', [authJwt.verifyToken, authJwt.isModerator], controller.moderatorBoard);
+
+  app.get('/api/users/admin', [authJwt.verifyToken, authJwt.isAdmin], controller.adminBoard);
 }

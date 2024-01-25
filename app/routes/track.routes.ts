@@ -10,11 +10,11 @@ export default function (app: Express) {
 
   app.post('/api/track', [authJwt.verifyToken], controller.createTrack);
 
-  app.get('/api/track/all', controller.allAccess);
+  app.get('/api/track', [authJwt.verifyToken], controller.readTrack);
 
-  app.get('/api/track/user', [authJwt.verifyToken], controller.userBoard);
+  app.put('/api/track', [authJwt.verifyToken], controller.updateTrack);
 
-  app.get('/api/track/mod', [authJwt.verifyToken, authJwt.isModerator], controller.moderatorBoard);
+  app.delete('/api/track', [authJwt.verifyToken], controller.deleteTrack);
 
-  app.get('/api/track/admin', [authJwt.verifyToken, authJwt.isAdmin], controller.adminBoard);
+  app.get('/api/tracks', controller.readTracks);
 }

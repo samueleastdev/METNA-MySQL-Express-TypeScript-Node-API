@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import Logger from '../logging';
+import Logger, { catchError } from '../logging';
 import db from '../models';
 
 const ROLES = db.ROLES;
@@ -11,12 +11,6 @@ const isValidEmail = (email: string) => {
 };
 
 const validateSignUpValues = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.body.username) {
-    res.status(400).send({
-      message: 'Failed! Username is required!',
-    });
-    return;
-  }
   if (!req.body.email) {
     res.status(400).send({
       message: 'Failed! Email is required!',
@@ -47,22 +41,7 @@ const validateSignUpValues = (req: Request, res: Response, next: NextFunction) =
 };
 
 const checkDuplicateUsernameOrEmail = async (req: Request, res: Response, next: NextFunction) => {
-  const logger = Logger.getInstance();
-  logger.info(JSON.stringify(req.body));
   try {
-    const usernameUser = await User.findOne({
-      where: {
-        username: req.body.username,
-      },
-    });
-
-    if (usernameUser) {
-      return res.status(400).send({
-        message: 'Failed! Username is already in use!',
-      });
-    }
-
-    // Check if email exists
     const emailUser = await User.findOne({
       where: {
         email: req.body.email,
@@ -77,10 +56,7 @@ const checkDuplicateUsernameOrEmail = async (req: Request, res: Response, next: 
 
     next();
   } catch (error) {
-    logger.error(error);
-    return res.status(500).send({
-      message: 'An error occurred while checking duplicate username or email.',
-    });
+    catchError(res, error, 'An error occurred while checking duplicate username or email.');
   }
 };
 

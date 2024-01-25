@@ -5,26 +5,39 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import awsRoutes from './routes/aws.routes';
 import trackRoutes from './routes/track.routes';
+import Logger from './logging';
 
 const app = express();
 
-interface CorsOptions {
-  origin: string;
-}
-
-const corsOptions: CorsOptions = {
-  origin: 'http://localhost:8081',
-};
-
-app.use(cors(corsOptions));
+app.use(cors({ credentials: true, origin: ['http://localhost:8100', 'http://localhost:3000'] }));
 
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  const logger = Logger.getInstance();
+
+  switch (req.method) {
+    case 'POST':
+      logger.network(`[POST] Route: ${req.originalUrl}, Body: ${JSON.stringify(req.body)}`);
+      break;
+
+    case 'GET':
+      logger.network(`[GET] Route: ${req.originalUrl}, Query: ${JSON.stringify(req.query)}`);
+      break;
+
+    default:
+      logger.network(`[${req.method}] Route: ${req.originalUrl}`);
+      break;
+  }
+
+  next();
+});
+
 db.sequelize.sync();
 // Force: true will drop the table if it already exists
-/* db.sequelize.sync({ force: true }).then(() => {
+/*db.sequelize.sync({ force: true }).then(() => {
   console.log('Drop and Resync Database with { force: true }');
   const Role = db.role;
 
@@ -42,8 +55,7 @@ db.sequelize.sync();
     id: 3,
     name: 'admin',
   });
-});
-*/
+});*/
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'App Started' });

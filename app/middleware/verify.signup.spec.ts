@@ -18,10 +18,9 @@ describe('verifySignUp Module', () => {
   });
 
   describe('validateSignUpValues Function', () => {
-    it('should call next() when username, email, password, roles is provided', () => {
+    it('should call next() when email, password, roles is provided', () => {
       const req: Request = {
         body: {
-          username: 'testUser',
           email: 'test@test.com',
           password: '12345',
           roles: ['user'],
@@ -36,7 +35,7 @@ describe('verifySignUp Module', () => {
       expect(next).toHaveBeenCalled();
     });
 
-    it('should send a 400 response when username is missing', () => {
+    it('should send a 400 response when email is missing', () => {
       const req = {
         body: {},
       } as Request;
@@ -50,7 +49,7 @@ describe('verifySignUp Module', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.send).toHaveBeenCalledWith({
-        message: 'Failed! Username is required!',
+        message: 'Failed! Email is required!',
       });
       expect(next).not.toHaveBeenCalled();
     });

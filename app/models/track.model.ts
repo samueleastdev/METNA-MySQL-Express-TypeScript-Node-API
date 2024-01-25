@@ -15,11 +15,17 @@ export default (sequelize: Sequelize) => {
       sanitizedName: {
         type: DataTypes.STRING,
       },
-      path: {
+      daw: {
         type: DataTypes.STRING,
       },
-      files: {
+      description: {
         type: DataTypes.TEXT,
+      },
+      files: {
+        type: DataTypes.JSON,
+      },
+      isPrivate: {
+        type: DataTypes.BOOLEAN,
       },
     },
     {

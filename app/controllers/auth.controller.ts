@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../models';
 import { config } from '../config/auth.config';
+import { catchError } from '../logging';
 
 const User = db.user;
 const Role = db.role;
@@ -21,7 +22,6 @@ interface RefreshTokenAttributes {
 export const signup = async (req: Request, res: Response) => {
   try {
     const user = await User.create({
-      username: req.body.username,
       email: req.body.email,
       password: bcrypt.hashSync(req.body.password, 8),
     });
@@ -41,8 +41,8 @@ export const signup = async (req: Request, res: Response) => {
 
     res.send({ message: 'User registered successfully!' });
     /* eslint-disable @typescript-eslint/no-explicit-any */
-  } catch (err: any) {
-    res.status(500).send({ message: err.message });
+  } catch (error: any) {
+    catchError(res, error, error.message);
   }
 };
 
@@ -50,7 +50,7 @@ export const signin = async (req: Request, res: Response) => {
   try {
     const user = await User.findOne({
       where: {
-        username: req.body.username,
+        email: req.body.email,
       },
     });
 
@@ -83,15 +83,14 @@ export const signin = async (req: Request, res: Response) => {
 
     res.status(200).send({
       id: user.id,
-      username: user.username,
       email: user.email,
       roles: authorities,
       accessToken: token,
       refreshToken: refreshToken,
     });
     /* eslint-disable @typescript-eslint/no-explicit-any */
-  } catch (err: any) {
-    res.status(500).send({ message: err.message });
+  } catch (error: any) {
+    catchError(res, error, error.message);
   }
 };
 
@@ -150,7 +149,7 @@ export const refreshToken = async (req: Request, res: Response) => {
       accessToken: newAccessToken,
       refreshToken: refreshToken.token,
     });
-  } catch (err) {
-    return res.status(500).send({ message: err });
+  } catch (error) {
+    catchError(res, error, 'Error refreshing token');
   }
 };
