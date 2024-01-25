@@ -1,10 +1,5 @@
 import { Request, Response } from 'express';
-import {
-  S3Client,
-  PutObjectCommand,
-  ListObjectsV2Command,
-  GetObjectCommand,
-} from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import db from '../models';
 import { createFileTree, sanitizeForUrl } from '../utils';
 import { catchError } from '../logging';
@@ -31,7 +26,7 @@ const User = db.user;
 
 export const createTrack = async (req: Request, res: Response) => {
   try {
-    const { name, description, files } = req.body;
+    const { name, description, daw, genre, files, isPrivate } = req.body;
 
     if (!name) {
       return res.status(400).send({
@@ -49,8 +44,11 @@ export const createTrack = async (req: Request, res: Response) => {
       defaults: {
         name,
         sanitizedName: s3Folder,
+        genre,
+        daw,
         description,
         files,
+        isPrivate,
         userId: req.userId,
       },
     });
@@ -63,8 +61,7 @@ export const createTrack = async (req: Request, res: Response) => {
         Body: '',
       });
       const response = await s3Client.send(command);
-      console.log('params', response);
-      res.status(200).send('samueleast/track/1');
+      res.status(200).send(response);
     } else {
       res.status(200).send({
         message: 'Track exists',
@@ -156,6 +153,7 @@ export const updateTrack = async (req: Request, res: Response) => {
     track.description = description || track.description;
     track.daw = daw || track.daw;
     track.files = files || track.files;
+
     await track.save();
 
     res.status(200).send({
@@ -163,7 +161,8 @@ export const updateTrack = async (req: Request, res: Response) => {
       data: track,
     });
   } catch (error) {
-    catchError(res, error, 'An error occurred while updating the track.');
+    console.log('error', error);
+    return catchError(res, error, 'An error occurred while updating the track.');
   }
 };
 

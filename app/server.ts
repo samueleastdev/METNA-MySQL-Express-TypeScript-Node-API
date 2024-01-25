@@ -27,6 +27,10 @@ app.use((req, res, next) => {
       logger.network(`[GET] Route: ${req.originalUrl}, Query: ${JSON.stringify(req.query)}`);
       break;
 
+    case 'PUT':
+      logger.network(`[PUT] Route: ${req.originalUrl}, Body: ${JSON.stringify(req.body)}`);
+      break;
+
     default:
       logger.network(`[${req.method}] Route: ${req.originalUrl}`);
       break;

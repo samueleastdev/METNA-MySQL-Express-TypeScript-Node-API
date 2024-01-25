@@ -6,6 +6,10 @@ export function sanitizeForUrl(text: string) {
   return sanitizedText;
 }
 
+export function getBasename(filePath: string): string {
+  return filePath.split('/').pop() || '';
+}
+
 interface TreeNode {
   path: string;
   basename: string;
@@ -24,14 +28,18 @@ export function createFileTree(
 ): { [key: string]: TreeNode } {
   const tree: { [key: string]: TreeNode } = {};
 
-  for (const fullPath in jsonData) {
-    if (!jsonData.hasOwnProperty(fullPath)) {
-      continue;
-    }
+  if (folderPath) {
+    tree['..'] = {
+      path: folderPath.split('/').slice(0, -1).join('/') || '/',
+      basename: '..',
+      isFile: false,
+      children: {},
+    };
+  }
 
-    if (folderPath && !fullPath.startsWith(folderPath)) {
-      continue;
-    }
+  for (const fullPath in jsonData) {
+    if (!jsonData.hasOwnProperty(fullPath)) continue;
+    if (folderPath && !fullPath.startsWith(folderPath)) continue;
 
     const relativePath = folderPath
       ? fullPath.substring(folderPath.length).replace(/^\//, '')
@@ -62,5 +70,25 @@ export function createFileTree(
     }
   }
 
-  return tree;
+  return sortTree(tree);
+}
+
+function sortTree(treeNode: { [key: string]: TreeNode }): { [key: string]: TreeNode } {
+  const sortedKeys = Object.keys(treeNode).sort((a, b) => {
+    const isFileA = treeNode[a].isFile;
+    const isFileB = treeNode[b].isFile;
+    if (isFileA && !isFileB) return 1;
+    if (!isFileA && isFileB) return -1;
+    return a.localeCompare(b);
+  });
+
+  const sortedTree: { [key: string]: TreeNode } = {};
+  for (const key of sortedKeys) {
+    sortedTree[key] = treeNode[key];
+    if (!treeNode[key].isFile) {
+      sortedTree[key].children = sortTree(treeNode[key].children);
+    }
+  }
+
+  return sortedTree;
 }

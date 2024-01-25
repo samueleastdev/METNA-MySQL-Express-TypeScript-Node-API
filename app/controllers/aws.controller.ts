@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import Logger from '../logging';
+import { catchError } from '../logging';
 import db from '../models';
 import {
   S3Client,
@@ -12,6 +12,7 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getBasename } from '../utils';
 
 // Ensure environment variables are set
 const awsRegion = process.env.AWS_REGION;
@@ -75,15 +76,13 @@ export const getUploadUrl = async (req: Request, res: Response) => {
     });
 
     res.send({ presignedUrl });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send(err);
+  } catch (error) {
+    catchError(res, error, 'An error occurred while completing upload.');
   }
 };
 
 export const completeUpload = async (req: Request, res: Response) => {
   try {
-    // Assuming the body has the structure: { params: { fileName, parts, uploadId } }
     const { fileName, parts, uploadId } = req.body.params;
 
     if (!fileName || !parts || !uploadId) {
@@ -104,37 +103,38 @@ export const completeUpload = async (req: Request, res: Response) => {
     const data = await s3Client.send(command);
 
     res.send({ data });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send(err);
+  } catch (error) {
+    catchError(res, error, 'An error occurred while completing upload.');
   }
 };
 
 export const generatePresignedUrl = async (req: Request, res: Response) => {
-  const logger = Logger.getInstance();
   try {
-    const key = `${req.userId}/${req.query.filename}`;
-    logger.info(key);
+    const filePath = req.query.filename;
+    const key = `${req.userId}/${filePath}`;
+
+    let basename;
+    if (typeof filePath === 'string') {
+      basename = getBasename(filePath);
+    }
+
     const params = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
+      ACL: basename === 'README.md' ? 'public-read' : undefined,
     });
 
     const url = await getSignedUrl(s3Client, params, { expiresIn: 3600 });
 
     res.status(200).send(url);
   } catch (error) {
-    logger.error(error);
-    return res.status(500).send({
-      message: 'An error occurred while generating presigned URL.',
-    });
+    catchError(res, error, 'An error occurred while generating presigned URL.');
   }
 };
 
 export const getS3Urls = async (req: Request, res: Response) => {
-  const logger = Logger.getInstance();
   try {
-    const folderKey = `${req.userId}/${req.query.folder}/`; // Ensure the trailing slash for the folder
+    const folderKey = `${req.userId}/${req.query.folder}/`;
     const listParams = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Prefix: folderKey,
@@ -163,30 +163,21 @@ export const getS3Urls = async (req: Request, res: Response) => {
 
     res.status(200).send(urls);
   } catch (error) {
-    logger.error(error);
-    return res.status(500).send({
-      message: 'An error occurred while generating presigned URLs.',
-    });
+    catchError(res, error, 'An error occurred while getting s3 URLs.');
   }
 };
 
 export const validateRequest = async (req: Request, res: Response) => {
-  const logger = Logger.getInstance();
   try {
     const key = `${req.userId}/${req.query.folder}/.audibase`;
 
-    // Check if the file exists on S3
     const headObjectParams = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
     };
 
-    // Use the headObject method to check if the object exists
     await s3Client.send(new HeadObjectCommand(headObjectParams));
 
-    // If the object exists, it will resolve successfully
-
-    // Check db
     const track = await Track.findOne({
       where: {
         sanitizedName: req.query.folder,
@@ -200,9 +191,6 @@ export const validateRequest = async (req: Request, res: Response) => {
       res.status(404).send({ message: 'Track not found.' });
     }
   } catch (error) {
-    logger.error(error);
-    return res.status(500).send({
-      message: 'An error occurred while generating presigned URL.',
-    });
+    catchError(res, error, 'An error occurred while validating request.');
   }
 };

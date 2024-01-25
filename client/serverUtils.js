@@ -8,6 +8,7 @@ async function getAccessToken(email, password) {
   const response = await axios.post(`${serverUrl}/api/auth/signin`, { email, password });
   if (!response.data.accessToken) throw new Error('Failed to get access token.');
   accessToken = response.data.accessToken;
+  return;
 }
 
 async function validateRequest(remotePath) {
@@ -40,17 +41,47 @@ async function getS3Urls(remote) {
   return response.data;
 }
 
-async function uploadComplete(uploadRecords, trackId) {
+async function downloadFiles(tracks, localFolder) {
+  for (const track of tracks) {
+    try {
+      const url = track.url;
+      const response = await axios({
+        method: 'GET',
+        url: url,
+        responseType: 'stream',
+      });
 
-  await axios.get(`${serverUrl}/api/track`, {
-    headers: { 'x-access-token': accessToken },
-    params: {
-      trackId,
-      files: uploadRecords
+      const localFilePath = path.resolve(localFolder, path.basename(track.key));
+      const writer = fs.createWriteStream(localFilePath);
+
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+
+      console.log(`Downloaded ${track.key} to ${localFilePath}`);
+    } catch (error) {
+      console.error(`Error downloading ${track.key}: ${error.message}`);
     }
-  });
-  console.log('Successfully uploaded...');
-  process.exit(1);
+  }
 }
 
-module.exports = { getAccessToken, validateRequest, getPresignedUrl, getS3Urls, uploadComplete };
+async function uploadComplete(uploadRecords, trackId) {
+  try {
+    await axios.put(`${serverUrl}/api/track`, {
+      trackId,
+      files: uploadRecords
+    }, {
+      headers: { 'x-access-token': accessToken }
+    });
+    console.log('Successfully uploaded...');
+    process.exit(1);
+  } catch (error) {
+    console.error(`Error `, error.message);
+  }
+}
+
+
+module.exports = { getAccessToken, validateRequest, getPresignedUrl, getS3Urls, downloadFiles, uploadComplete };

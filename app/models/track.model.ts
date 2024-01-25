@@ -18,6 +18,9 @@ export default (sequelize: Sequelize) => {
       daw: {
         type: DataTypes.STRING,
       },
+      genre: {
+        type: DataTypes.STRING,
+      },
       description: {
         type: DataTypes.TEXT,
       },

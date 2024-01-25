@@ -6,7 +6,7 @@ const path = require('path');
 
 const { checkFileExists, getLastUploadTimes, updateLastUploadTime, readUploadRecords } = require('./fileUtils');
 const { getEmail, getPassword, getRemotePath, getDestination } = require('./inputUtils');
-const { getAccessToken, validateRequest, getPresignedUrl, getS3Urls, uploadComplete } = require('./serverUtils');
+const { getAccessToken, validateRequest, getPresignedUrl, getS3Urls, downloadFiles, uploadComplete } = require('./serverUtils');
 const { formatBytes, getSubdirectoryPath, readKeyValuePairsFromFile, getMimeType } = require('./helperUtils');
 
 let email, password, localPath = process.cwd(), remote, trackId;
@@ -47,6 +47,11 @@ async function uploadToPresignedUrl(presignedUrl, filePath) {
 async function processDirectory(directoryPath) {
   const entries = await fs.readdir(directoryPath, { withFileTypes: true });
   for (const dirent of entries) {
+
+    if (dirent.name === '.DS_Store') {
+      continue;
+    }
+
     const entryPath = path.join(directoryPath, dirent.name);
 
     if (dirent.isFile()) {
@@ -80,33 +85,6 @@ async function initializeFromUserInput() {
   fs.writeFileSync('.audibase', fileContent);
 }
 
-async function downloadFiles(tracks, localFolder) {
-  for (const track of tracks) {
-    try {
-      const url = track.url;
-      const response = await axios({
-        method: 'GET',
-        url: url,
-        responseType: 'stream',
-      });
-
-      const localFilePath = path.resolve(localFolder, path.basename(track.key));
-      const writer = fs.createWriteStream(localFilePath);
-
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      console.log(`Downloaded ${track.key} to ${localFilePath}`);
-    } catch (error) {
-      console.error(`Error downloading ${track.key}: ${error.message}`);
-    }
-  }
-}
-
 async function main() {
   try {
     const audibaseFileExists = checkFileExists('.audibase');
@@ -118,7 +96,6 @@ async function main() {
 
     if (network === 'pull') {
       const getTracks = await getS3Urls(remote);
-      console.log('getTracks', getTracks);
       await downloadFiles(getTracks, localPath);
       console.log('Successfully download...');
       process.exit(1);

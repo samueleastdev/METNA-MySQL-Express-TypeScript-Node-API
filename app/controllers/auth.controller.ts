@@ -22,6 +22,7 @@ interface RefreshTokenAttributes {
 export const signup = async (req: Request, res: Response) => {
   try {
     const user = await User.create({
+      nicename: req.body.nicename,
       email: req.body.email,
       password: bcrypt.hashSync(req.body.password, 8),
     });
