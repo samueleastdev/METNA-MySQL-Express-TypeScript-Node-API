@@ -34,81 +34,6 @@ const s3Client = new S3Client({
 
 const Track = db.track;
 
-export const startUpload = async (req: Request, res: Response) => {
-  try {
-    //const key = `${req.userId}/${req.query.filename}`;
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: req.query.fileName as string,
-      ContentType: req.query.fileType as string,
-    };
-
-    console.log('startUpload', params);
-
-    const command = new CreateMultipartUploadCommand(params);
-    const uploadData = await s3Client.send(command);
-    res.send({ uploadId: uploadData.UploadId });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send(err);
-  }
-};
-
-export const getUploadUrl = async (req: Request, res: Response) => {
-  try {
-    const fileName = req.query.fileName as string;
-    const partNumber = parseInt(req.query.partNumber as string, 10);
-    const uploadId = req.query.uploadId as string;
-
-    if (!fileName || !uploadId) {
-      res.status(400).send('Missing required query parameters');
-      return;
-    }
-
-    const command = new UploadPartCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: fileName,
-      PartNumber: partNumber,
-      UploadId: uploadId,
-    });
-
-    const presignedUrl = await getSignedUrl(s3Client, command, {
-      expiresIn: 3600, // Time in seconds, e.g., 3600 for 1 hour
-    });
-
-    res.send({ presignedUrl });
-  } catch (error) {
-    catchError(res, error, 'An error occurred while completing upload.');
-  }
-};
-
-export const completeUpload = async (req: Request, res: Response) => {
-  try {
-    const { fileName, parts, uploadId } = req.body.params;
-
-    if (!fileName || !parts || !uploadId) {
-      res.status(400).send('Missing required parameters in body');
-      return;
-    }
-
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: fileName,
-      MultipartUpload: {
-        Parts: parts,
-      },
-      UploadId: uploadId,
-    };
-
-    const command = new CompleteMultipartUploadCommand(params);
-    const data = await s3Client.send(command);
-
-    res.send({ data });
-  } catch (error) {
-    catchError(res, error, 'An error occurred while completing upload.');
-  }
-};
-
 export const generatePresignedUrl = async (req: Request, res: Response) => {
   try {
     const operation = req.query.operation; // Determine the operation type (e.g., 'put' or 'delete')
@@ -231,10 +156,8 @@ export const getPreviewUrl = async (req: Request, res: Response) => {
     };
 
     try {
-      // Check if the object exists
       await s3Client.send(new HeadObjectCommand(headParams));
 
-      // Object exists, generate a signed URL
       const urlParams = {
         Bucket: process.env.AWS_BUCKET_NAME,
         Key: objectKey,
@@ -250,7 +173,6 @@ export const getPreviewUrl = async (req: Request, res: Response) => {
       if (headErr.name === 'NotFound' || headErr.message.includes('404')) {
         res.status(404).send('Object not found');
       } else {
-        // Handle other possible errors
         catchError(res, headErr, 'Error checking object existence');
       }
     }
