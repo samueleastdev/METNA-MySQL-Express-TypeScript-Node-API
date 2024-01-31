@@ -23,8 +23,7 @@ async function validateRequest(remotePath) {
 }
 
 async function getPresignedUrl(fileName, action) {
-  console.log('action', action);
-  const response = await axios.get(`${serverUrl}/api/aws/generate-presigned-url`, {
+  const response = await axios.get(`${serverUrl}/api/aws/presigned/${action}`, {
     headers: { 'x-access-token': accessToken },
     params: {
       filename: fileName,

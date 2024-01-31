@@ -59,6 +59,6 @@ export function catchError(res: Response, error: any, message: string) {
   const logger = Logger.getInstance();
   logger.error(error);
   return res.status(500).send({
-    message,
+    error: message,
   });
 }

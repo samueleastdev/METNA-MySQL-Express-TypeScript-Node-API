@@ -12,7 +12,6 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getBasename } from '../utils';
 
-// Ensure environment variables are set
 const awsRegion = process.env.AWS_REGION;
 const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
 const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
@@ -31,36 +30,55 @@ const s3Client = new S3Client({
 
 const Track = db.track;
 
-export const generatePresignedUrl = async (req: Request, res: Response) => {
+export const generatePresignedUploadUrl = async (req: Request, res: Response) => {
   try {
-    const operation = req.query.operation; // Determine the operation type (e.g., 'put' or 'delete')
     const filePath = req.query.filename;
-    const key = `${req.userId}/${filePath}`;
 
-    let params;
-
-    if (operation === 'delete') {
-      // Parameters for Delete operation
-      params = new DeleteObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: key,
-      });
-    } else {
-      // Parameters for Put operation
-      let basename;
-      if (typeof filePath === 'string') {
-        basename = getBasename(filePath);
-      }
-
-      params = new PutObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: key,
-        ACL: basename === 'README.md' ? 'public-read' : undefined,
+    if (!filePath) {
+      return res.status(400).json({
+        error: 'Missing required parameters. Please include filename.',
       });
     }
 
+    const key = `${req.userId}/${filePath}`;
+
+    let basename;
+    if (typeof filePath === 'string') {
+      basename = getBasename(filePath);
+    }
+
+    const params = new PutObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      ACL: basename === 'README.md' ? 'public-read' : undefined,
+    });
+
     const url = await getSignedUrl(s3Client, params, { expiresIn: 3600 });
 
+    res.status(200).send(url);
+  } catch (error) {
+    return catchError(res, error, 'An error occurred while generating presigned URL.');
+  }
+};
+
+export const generatePresignedDeleteUrl = async (req: Request, res: Response) => {
+  try {
+    const filePath = req.query.filename;
+
+    if (!filePath) {
+      return res.status(400).send({
+        error: 'Missing required parameters. Please include filename.',
+      });
+    }
+
+    const key = `${req.userId}/${filePath}`;
+
+    const params = new DeleteObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(s3Client, params, { expiresIn: 3600 });
     res.status(200).send(url);
   } catch (error) {
     catchError(res, error, 'An error occurred while generating presigned URL.');
@@ -74,8 +92,6 @@ export const getS3Urls = async (req: Request, res: Response) => {
       Bucket: process.env.AWS_BUCKET_NAME,
       Prefix: folderKey,
     };
-
-    console.log('folderKey', folderKey);
 
     const listCommand = new ListObjectsV2Command(listParams);
     const objectsList = await s3Client.send(listCommand);
