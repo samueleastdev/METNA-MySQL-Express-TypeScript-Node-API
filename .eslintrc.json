@@ -3,6 +3,7 @@
     "browser": true,
     "node": true
   },
+  "ignorePatterns": ["client/**"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",

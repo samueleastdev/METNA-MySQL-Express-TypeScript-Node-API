@@ -1,4 +1,5 @@
 const axios = require('axios');
+const path = require('path');
 
 const serverUrl = 'http://localhost:8080';
 
@@ -21,11 +22,13 @@ async function validateRequest(remotePath) {
   return response.data;
 }
 
-async function getPresignedUrl(fileName) {
+async function getPresignedUrl(fileName, action) {
+  console.log('action', action);
   const response = await axios.get(`${serverUrl}/api/aws/generate-presigned-url`, {
     headers: { 'x-access-token': accessToken },
     params: {
-      filename: fileName
+      filename: fileName,
+      operation: action
     }
   });
   return response.data;
@@ -76,8 +79,7 @@ async function uploadComplete(uploadRecords, trackId) {
     }, {
       headers: { 'x-access-token': accessToken }
     });
-    console.log('Successfully uploaded...');
-    process.exit(1);
+    return true;
   } catch (error) {
     console.error(`Error `, error.message);
   }

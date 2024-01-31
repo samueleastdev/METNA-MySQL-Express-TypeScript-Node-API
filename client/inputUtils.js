@@ -1,56 +1,62 @@
-const readline = require('readline');
+const prompts = require('prompts');
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+async function getLogoutData() {
 
-function getEmail() {
-  return new Promise((resolve) => {
-    rl.question('Enter Audibase email: ', (email) => {
-      resolve(email);
-    });
-  });
+  const response = await prompts([
+    {
+      type: 'text',
+      name: 'remote',
+      message: `Enter remote url:`
+    },
+    {
+      type: 'autocomplete',
+      name: 'option',
+      message: 'Pick an option',
+      hint: '- Space to select. Return to submit',
+      choices: [
+        { title: 'push', value: 'push' },
+        { title: 'pull', value: 'pull' },
+        { title: 'diff', value: 'diff' },
+        { title: 'list', value: 'list' },
+      ]
+    },
+    {
+      type: 'text',
+      name: 'email',
+      message: `Enter Audibase email:`
+    },
+    {
+      type: 'password',
+      name: 'password',
+      message: `Enter Audibase password:`
+    },
+  ]);
+
+  return response;
 }
 
-function getPassword() {
-  return new Promise((resolve) => {
-    rl.question('Enter Audibase password: ', (password) => {
-      resolve(password);
-    });
-  });
+async function getLoginData() {
+
+  const response = await prompts([
+    {
+      type: 'autocomplete',
+      name: 'option',
+      message: 'Pick an option',
+      hint: '- Space to select. Return to submit',
+      choices: [
+        { title: 'push', value: 'push' },
+        { title: 'pull', value: 'pull' },
+        { title: 'list', value: 'list' },
+      ]
+    },
+    {
+      type: 'password',
+      name: 'password',
+      message: `Enter Audibase password:`
+    },
+  ]);
+
+  return response;
 }
 
-function getRemotePath() {
-  return new Promise((resolve) => {
-    rl.question('Enter the remote path: ', (remotePath) => {
-      resolve(remotePath);
-    });
-  });
-}
-
-function askQuestion(question, options) {
-  return new Promise((resolve) => {
-    const ask = () => {
-      rl.question(question, (answer) => {
-        const normalizedAnswer = answer.toLowerCase();
-        if (options.includes(normalizedAnswer)) {
-          resolve(normalizedAnswer);
-        } else {
-          console.log(`Please enter one of the following: ${options.join(', ')}`);
-          ask(); // ask again
-        }
-      });
-    };
-    ask();
-  });
-}
-
-// Usage example:
-async function getDestination() {
-  const destination = await askQuestion('Pull or push?: ', ['pull', 'push']);
-  console.log(`You selected: ${destination}`);
-  return destination;
-}
-
-module.exports = { getEmail, getPassword, getRemotePath, getDestination };
+module.exports = { getLogoutData, getLoginData };

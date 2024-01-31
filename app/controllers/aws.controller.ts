@@ -4,6 +4,7 @@ import db from '../models';
 import {
   S3Client,
   PutObjectCommand,
+  DeleteObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   CreateMultipartUploadCommand,
@@ -110,19 +111,31 @@ export const completeUpload = async (req: Request, res: Response) => {
 
 export const generatePresignedUrl = async (req: Request, res: Response) => {
   try {
+    const operation = req.query.operation; // Determine the operation type (e.g., 'put' or 'delete')
     const filePath = req.query.filename;
     const key = `${req.userId}/${filePath}`;
 
-    let basename;
-    if (typeof filePath === 'string') {
-      basename = getBasename(filePath);
-    }
+    let params;
 
-    const params = new PutObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      ACL: basename === 'README.md' ? 'public-read' : undefined,
-    });
+    if (operation === 'delete') {
+      // Parameters for Delete operation
+      params = new DeleteObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: key,
+      });
+    } else {
+      // Parameters for Put operation
+      let basename;
+      if (typeof filePath === 'string') {
+        basename = getBasename(filePath);
+      }
+
+      params = new PutObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: key,
+        ACL: basename === 'README.md' ? 'public-read' : undefined,
+      });
+    }
 
     const url = await getSignedUrl(s3Client, params, { expiresIn: 3600 });
 
@@ -139,6 +152,8 @@ export const getS3Urls = async (req: Request, res: Response) => {
       Bucket: process.env.AWS_BUCKET_NAME,
       Prefix: folderKey,
     };
+
+    console.log('folderKey', folderKey);
 
     const listCommand = new ListObjectsV2Command(listParams);
     const objectsList = await s3Client.send(listCommand);
@@ -157,7 +172,11 @@ export const getS3Urls = async (req: Request, res: Response) => {
         const url = await getSignedUrl(s3Client, new GetObjectCommand(urlParams), {
           expiresIn: 3600,
         });
-        return { key: object.Key, url };
+        return {
+          basePath: object.Key?.replace(`${req.userId}/${req.query.folder}/`, ''),
+          key: object.Key,
+          url,
+        };
       }),
     );
 
@@ -192,5 +211,50 @@ export const validateRequest = async (req: Request, res: Response) => {
     }
   } catch (error) {
     catchError(res, error, 'An error occurred while validating request.');
+  }
+};
+
+export const getPreviewUrl = async (req: Request, res: Response) => {
+  try {
+    const trackName = req.query.name as string;
+    const userId = req.query.userId as string;
+
+    if (!trackName || !userId) {
+      res.status(400).send('Missing required query parameters');
+      return;
+    }
+
+    const objectKey = `${userId}/${trackName}/track.mp3`;
+    const headParams = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: objectKey,
+    };
+
+    try {
+      // Check if the object exists
+      await s3Client.send(new HeadObjectCommand(headParams));
+
+      // Object exists, generate a signed URL
+      const urlParams = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: objectKey,
+      };
+
+      const url = await getSignedUrl(s3Client, new GetObjectCommand(urlParams), {
+        expiresIn: 3600,
+      });
+
+      res.send({ url });
+    } catch (error) {
+      const headErr = error as Error;
+      if (headErr.name === 'NotFound' || headErr.message.includes('404')) {
+        res.status(404).send('Object not found');
+      } else {
+        // Handle other possible errors
+        catchError(res, headErr, 'Error checking object existence');
+      }
+    }
+  } catch (error) {
+    catchError(res, error as Error, 'An error occurred while completing upload.');
   }
 };

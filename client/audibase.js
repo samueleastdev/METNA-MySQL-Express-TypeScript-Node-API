@@ -4,35 +4,19 @@ const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
 
-const { checkFileExists, getLastUploadTimes, updateLastUploadTime, readUploadRecords } = require('./fileUtils');
-const { getEmail, getPassword, getRemotePath, getDestination } = require('./inputUtils');
-const { getAccessToken, validateRequest, getPresignedUrl, getS3Urls, downloadFiles, uploadComplete } = require('./serverUtils');
-const { formatBytes, getSubdirectoryPath, readKeyValuePairsFromFile, getMimeType } = require('./helperUtils');
+const { checkFileExists, readUploadRecords, getAllFiles } = require('./fileUtils');
+const { getLogoutData, getLoginData } = require('./inputUtils');
+const { getAccessToken, validateRequest, getPresignedUrl, getS3Urls, uploadComplete } = require('./serverUtils');
+const { formatBytes, readKeyValuePairsFromFile, getMimeType } = require('./helperUtils');
 
-let email, password, localPath = process.cwd(), remote, trackId;
-
-async function uploadFile(filePath) {
-  const s3Key = getSubdirectoryPath(filePath, localPath);
-  const fileStats = await fs.stat(filePath);
-  const lastModified = fileStats.mtime.getTime();
-  const lastUploadTimes = await getLastUploadTimes();
-
-  if (lastUploadTimes[s3Key] === lastModified) {
-    console.log(`Skipping unmodified file: ${s3Key}`);
-    return;
-  }
-
-  const presignedUrl = await getPresignedUrl(`${remote}/${s3Key}`);
-  await uploadToPresignedUrl(presignedUrl, filePath);
-  await updateLastUploadTime(s3Key, lastModified);
-}
+let email, localPath = process.cwd(), remote, option, trackId;
 
 async function uploadToPresignedUrl(presignedUrl, filePath) {
   const { size } = await fs.stat(filePath);
   const fileName = path.basename(filePath);
   const fileStream = fs.createReadStream(filePath);
 
-  console.log(`Uploading... ${fileName}:${getMimeType(fileName)} with size ${formatBytes(size)} bytes.`);
+  console.log('\x1b[36m%s\x1b[0m', `Uploading... ${fileName}:${getMimeType(fileName)} with size ${formatBytes(size)} bytes.`);
 
   const response = await axios.put(presignedUrl, fileStream, {
     headers: {
@@ -44,46 +28,28 @@ async function uploadToPresignedUrl(presignedUrl, filePath) {
   return response;
 }
 
-async function processDirectory(directoryPath) {
-  const entries = await fs.readdir(directoryPath, { withFileTypes: true });
-  for (const dirent of entries) {
-
-    if (dirent.name === '.DS_Store') {
-      continue;
-    }
-
-    const entryPath = path.join(directoryPath, dirent.name);
-
-    if (dirent.isFile()) {
-      await uploadFile(entryPath);
-    } else if (dirent.isDirectory()) {
-      await processDirectory(entryPath);
-    }
-  }
-}
-
 async function initializeFromAudibaseFile() {
   const keyValuePairs = readKeyValuePairsFromFile('.audibase');
   if (!keyValuePairs) throw new Error('Failed to read key-value pairs from Audibase file.');
-  ({ email, remote, network, trackId } = keyValuePairs);
-  network = await getDestination();
-  password = await getPassword();
-  await getAccessToken(email, password);
+  ({ email, remote, trackId } = keyValuePairs);
+  const data = await getLoginData();
+  option = data.option;
+  await getAccessToken(email, data.password);
 }
 
 async function initializeFromUserInput() {
-  network = await getDestination();
-  remote = await getRemotePath();
-  email = await getEmail();
-  password = await getPassword();
-  await getAccessToken(email, password);
+  const data = await getLogoutData();
+  option = data.option;
+  remote = data.remote;
+  await getAccessToken(data.email, data.password);
 
   const track = await validateRequest(remote);
   trackId = track.id;
 
-  const fileContent = `email=${email}\nnetwork=${network}\nremote=${remote}\ntrackId=${track.id}\n`;
+  const fileContent = `email=${data.email}\nremote=${remote}\ntrackId=${track.id}\n`;
   fs.writeFileSync('.audibase', fileContent);
 }
+
 
 async function main() {
   try {
@@ -94,20 +60,97 @@ async function main() {
       await initializeFromUserInput();
     }
 
-    if (network === 'pull') {
-      const getTracks = await getS3Urls(remote);
-      await downloadFiles(getTracks, localPath);
-      console.log('Successfully download...');
-      process.exit(1);
-    }
-    if (network === 'push') {
-      await processDirectory(localPath);
-      const uploadRecords = await readUploadRecords();
-      await uploadComplete(uploadRecords, trackId);
+    let syncData, message;
+
+    try {
+      syncData = JSON.parse(fs.readFileSync('./sync.json', 'utf8'));
+    } catch (error) {
+      console.warn('Sync file not found or invalid, initializing new sync data.');
+      syncData = {};
     }
 
+    const localFiles = getAllFiles(localPath);
+    const remoteFiles = await getS3Urls(remote);
+
+    if (option === 'pull') {
+
+      for (const remoteFile of remoteFiles) {
+        const remoteFilePath = remoteFile.key;
+        const localFilePath = path.join(localPath, remoteFile.basePath);
+
+
+        if (path.basename(remoteFilePath) === '.DS_Store') {
+          continue;
+        }
+
+        const fileExistsLocally = localFiles.includes(localFilePath);
+        const remoteFileLastModified = new Date();
+
+        if (!fileExistsLocally || (syncData[remoteFilePath] && new Date(syncData[remoteFilePath].lastModified) < remoteFileLastModified)) {
+          const downloadUrl = remoteFile.url;
+          const response = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
+
+          fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
+          fs.writeFileSync(localFilePath, response.data);
+          syncData[remoteFilePath] = { lastModified: remoteFileLastModified.toISOString(), location: 'remote' };
+        }
+      }
+
+      for (const fileName in syncData) {
+        if (!remoteFiles.map(file => file.basePath).includes(fileName)) {
+          const localFilePath = path.join(localPath, fileName);
+          if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+          }
+          delete syncData[fileName];
+          console.log('\x1b[31m%s\x1b[0m', `Deleted... ${syncData[fileName]}`);
+        }
+      }
+
+      message = 'Successfully synced remote to local';
+
+    }
+    if (option === 'push') {
+
+      // Local to remote sync
+      for (const filePath of localFiles) {
+        const relativePath = path.relative(localPath, filePath);
+
+        if (path.basename(filePath) === '.DS_Store') {
+          continue;
+        }
+
+        const fileStats = fs.statSync(filePath);
+        if (!syncData[relativePath] || syncData[relativePath].lastModified < fileStats.mtime.toISOString()) {
+          const presignedUrl = await getPresignedUrl(`${remote}/${relativePath}`, 'upload');
+          await uploadToPresignedUrl(presignedUrl, filePath);
+          syncData[relativePath] = { lastModified: fileStats.mtime.toISOString(), location: 'local' };
+        }
+      }
+
+      // Delete files from S3 if they are deleted locally
+      for (const fileName in syncData) {
+        if (!localFiles.includes(path.join(localPath, fileName))) {
+          const deleteUrl = await getPresignedUrl(`${remote}/${fileName}`, 'delete');
+          await axios.delete(deleteUrl);
+          delete syncData[fileName];
+          console.log('\x1b[31m%s\x1b[0m', `Deleted... ${syncData[fileName]}`);
+        }
+      }
+
+      message = 'Successfully synced local to remote';
+
+    }
+
+    fs.writeFileSync('./sync.json', JSON.stringify(syncData, null, 2));
+
+    await uploadComplete(syncData, trackId);
+
+    console.log('\x1b[36m%s\x1b[0m', message);
+    process.exit(1);
+
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    console.error('\x1b[31m%s\x1b[0m', `Error: ${error.message}`);
     process.exit(1);
   }
 }

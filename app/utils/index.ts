@@ -10,6 +10,35 @@ export function getBasename(filePath: string): string {
   return filePath.split('/').pop() || '';
 }
 
+export function generateRandomString(length: number) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const charactersLength = characters.length;
+
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charactersLength);
+    result += characters.charAt(randomIndex);
+  }
+
+  return result;
+}
+
+export function isStrongPassword(password: string) {
+  if (password.length < 8) {
+    return false;
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return false;
+  }
+
+  if (!/[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]/.test(password)) {
+    return false;
+  }
+
+  return true;
+}
+
 interface TreeNode {
   path: string;
   basename: string;

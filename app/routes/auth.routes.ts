@@ -1,5 +1,5 @@
 import { Express, Request, Response, NextFunction } from 'express';
-import { verifySignUp } from '../middleware';
+import { authJwt, verifySignUp } from '../middleware';
 import * as controller from '../controllers/auth.controller';
 
 export default function (app: Express) {
@@ -21,4 +21,8 @@ export default function (app: Express) {
   app.post('/api/auth/signin', controller.signin);
 
   app.post('/api/auth/refreshtoken', controller.refreshToken);
+
+  app.post('/api/auth/google', controller.googleAuth);
+
+  app.put('/api/auth/password', [authJwt.verifyToken], controller.password);
 }

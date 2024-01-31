@@ -1,4 +1,5 @@
 const fs = require('fs-extra');
+const path = require('path');
 
 const uploadRecordFile = './sync.json';
 
@@ -35,4 +36,20 @@ async function readUploadRecords() {
   }
 }
 
-module.exports = { checkFileExists, getLastUploadTimes, updateLastUploadTime, readUploadRecords };
+function getAllFiles(dirPath, arrayOfFiles) {
+  let files = fs.readdirSync(dirPath);
+
+  arrayOfFiles = arrayOfFiles || [];
+
+  files.forEach(file => {
+    if (fs.statSync(dirPath + "/" + file).isDirectory()) {
+      arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+    } else {
+      arrayOfFiles.push(path.join(dirPath, "/", file));
+    }
+  });
+
+  return arrayOfFiles;
+}
+
+module.exports = { checkFileExists, getLastUploadTimes, updateLastUploadTime, readUploadRecords, getAllFiles };

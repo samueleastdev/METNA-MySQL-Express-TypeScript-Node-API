@@ -7,6 +7,8 @@ export default (sequelize: Sequelize) => {
     public email!: string;
     public password!: string;
     // Optional fields
+    public sub?: string;
+    public picture?: string;
     public nicename?: string;
     public description?: string;
     public location?: string;
@@ -21,9 +23,17 @@ export default (sequelize: Sequelize) => {
         autoIncrement: true,
         primaryKey: true,
       },
+      sub: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       email: {
         type: DataTypes.STRING,
         allowNull: false,
+      },
+      picture: {
+        type: DataTypes.TEXT,
+        allowNull: true,
       },
       password: {
         type: DataTypes.STRING,

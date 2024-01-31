@@ -12,6 +12,8 @@ export const readUser = async (req: Request, res: Response) => {
       },
       attributes: [
         'email',
+        'picture',
+        'sub',
         'nicename',
         'description',
         'location',

@@ -23,4 +23,6 @@ export default function (app: Express) {
   );
 
   app.get('/api/aws/validate-request', [authJwt.verifyToken], controller.validateRequest);
+
+  app.get('/api/aws/get-preview-url', controller.getPreviewUrl);
 }
